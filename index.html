@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TUVN - Monitoreo Térmico</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body { 
+            font-family: 'Roboto', sans-serif;
+            transition: background-color 0.8s ease;
+        }
+        .sensor-card {
+            transition: all 0.3s ease;
+        }
+        .sensor-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+        .ping-dot {
+            animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+        @keyframes ping {
+            75%, 100% { transform: scale(2); opacity: 0; }
+        }
+        
+        .digital-display {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            border: 3px solid #64748b;
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.3);
+            font-family: 'Courier New', monospace;
+            color: #22d3ee;
+            text-shadow: 0 0 10px rgba(34, 211, 238, 0.8);
+            margin: 0 auto 10px;
+            width: 140px;
+        }
+        
+        @keyframes blink {
+            0%, 50%, 100% { opacity: 1; }
+            25%, 75% { opacity: 0.3; }
+        }
+        .blink-animation {
+            animation: blink 1.5s infinite;
+        }
+        
+        @keyframes heat-wave {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+        .heat-wave {
+            animation: heat-wave 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin-slow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .fan-spin {
+            animation: spin-slow 2s linear infinite;
+        }
+
+        /* ================================
+           TERMÓMETROS VECTORIALES SVG
+        ================================== */
+        .thermo-container {
+            width: 80px;
+            margin: auto;
+        }
+        .thermo-svg {
+            width: 80px;
+            height: 180px;
+        }
+        .mercury {
+            transition: all 0.6s ease;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col">
+
+    <!-- HEADER -->
+    <header class="bg-blue-900 text-white shadow-lg border-b-4 border-red-600">
+        <div class="container mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-white p-2 rounded-full">
+                    <i data-lucide="graduation-cap" class="w-8 h-8 text-blue-900"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold tracking-tight">TUVN</h1>
+                    <p class="text-xs text-blue-200 font-semibold tracking-widest">AUTOMATIZACIÓN E INSTRUMENTACIÓN</p>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3">
+                <!-- Estado -->
+                <div class="flex items-center gap-3 bg-blue-950/50 px-4 py-2 rounded-lg border border-blue-400/30">
+                    <div class="relative flex h-3 w-3">
+                      <span id="pingDot" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75 hidden"></span>
+                      <span id="staticDot" class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                    </div>
+                    <span id="statusText" class="text-sm font-mono text-red-200">Desconectado</span>
+                </div>
+
+                <!-- Menú modo -->
+                <div class="flex items-center gap-3 bg-blue-950/50 px-4 py-2 rounded-lg border border-blue-400/30">
+                    <i data-lucide="settings" class="w-4 h-4 text-blue-300"></i>
+                    <label class="text-sm text-blue-200 font-medium">Modo:</label>
+                    <select id="modeSelector" class="bg-blue-900 text-white px-3 py-1 rounded border border-blue-400 text-sm font-medium cursor-pointer">
+                        <option value="auto">AUTOMÁTICO</option>
+                        <option value="manual">MANUAL</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- BARRA -->
+    <div class="bg-white border-b border-slate-200 shadow-sm">
+        <div class="container mx-auto px-4 py-2 flex flex-wrap justify-between items-center text-sm text-slate-600">
+            <span>Desarrollador: <b>Carlos Ruiz</b></span>
+
+            <div class="flex gap-4 font-mono text-slate-500">
+                <span id="dateDisplay">--/--/----</span>
+                <span id="timeDisplay" class="text-blue-700 font-bold">--:--:--</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONTENIDO -->
+    <main class="flex-grow container mx-auto px-4 py-8">
+        
+        <h2 class="text-3xl text-center font-bold mb-8">Monitoreo de Temperatura por Cuartos</h2>
+
+        <!-- GRID DE SENSORES -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+
+            <!-- CUARTO 1 -->
+            <div class="sensor-card bg-white rounded-xl shadow p-6">
+                <h3 class="bg-blue-600 text-white font-bold p-3 rounded">CUARTO 1</h3>
+
+                <div class="digital-display">
+                    <div class="text-5xl font-bold" id="val1">--</div>
+                </div>
+
+                <!-- TERMÓMETRO SVG -->
+                <div class="thermo-container">
+                    <svg class="thermo-svg" viewBox="0 0 60 200">
+                        <rect x="25" y="20" width="10" height="140" rx="5" stroke="#64748b" stroke-width="3" fill="#e5e7eb"></rect>
+                        <rect id="merS1" class="mercury" x="25" y="160" width="10" height="0" fill="#ef4444"></rect>
+                        <circle cx="30" cy="170" r="20" fill="#ef4444"></circle>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- CUARTO 2 -->
+            <div class="sensor-card bg-white rounded-xl shadow p-6">
+                <h3 class="bg-red-600 text-white font-bold p-3 rounded">CUARTO 2</h3>
+
+                <div class="digital-display">
+                    <div class="text-5xl font-bold" id="val2">--</div>
+                </div>
+
+                <div class="thermo-container">
+                    <svg class="thermo-svg" viewBox="0 0 60 200">
+                        <rect x="25" y="20" width="10" height="140" rx="5" stroke="#64748b" stroke-width="3" fill="#e5e7eb"></rect>
+                        <rect id="merS2" class="mercury" x="25" y="160" width="10" height="0" fill="#ef4444"></rect>
+                        <circle cx="30" cy="170" r="20" fill="#ef4444"></circle>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- CUARTO 3 -->
+            <div class="sensor-card bg-white rounded-xl shadow p-6">
+                <h3 class="bg-blue-600 text-white font-bold p-3 rounded">CUARTO 3</h3>
+
+                <div class="digital-display">
+                    <div class="text-5xl font-bold" id="val3">--</div>
+                </div>
+
+                <div class="thermo-container">
+                    <svg class="thermo-svg" viewBox="0 0 60 200">
+                        <rect x="25" y="20" width="10" height="140" rx="5" stroke="#64748b" stroke-width="3" fill="#e5e7eb"></rect>
+                        <rect id="merS3" class="mercury" x="25" y="160" width="10" height="0" fill="#ef4444"></rect>
+                        <circle cx="30" cy="170" r="20" fill="#ef4444"></circle>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- CUARTO 4 -->
+            <div class="sensor-card bg-white rounded-xl shadow p-6">
+                <h3 class="bg-red-600 text-white font-bold p-3 rounded">CUARTO 4</h3>
+
+                <div class="digital-display">
+                    <div class="text-5xl font-bold" id="val4">--</div>
+                </div>
+
+                <div class="thermo-container">
+                    <svg class="thermo-svg" viewBox="0 0 60 200">
+                        <rect x="25" y="20" width="10" height="140" rx="5" stroke="#64748b" stroke-width="3" fill="#e5e7eb"></rect>
+                        <rect id="merS4" class="mercury" x="25" y="160" width="10" height="0" fill="#ef4444"></rect>
+                        <circle cx="30" cy="170" r="20" fill="#ef4444"></circle>
+                    </svg>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- PROMEDIO -->
+        <div id="averagePanel" class="mt-10 bg-white rounded-2xl shadow-xl p-10 text-center border-4">
+            
+            <h3 class="text-2xl font-bold mb-4">TEMPERATURA PROMEDIO</h3>
+
+            <div class="digital-display" style="width:200px;">
+                <div id="averageTemp" class="text-6xl font-bold">--</div>
+            </div>
+
+            <!-- TERMÓMETRO PROMEDIO -->
+            <div class="thermo-container">
+                <svg class="thermo-svg" viewBox="0 0 60 200">
+                    <rect x="25" y="20" width="10" height="140" rx="5" stroke="#64748b" stroke-width="3" fill="#e5e7eb"></rect>
+                    <rect id="merAVG" class="mercury" x="25" y="160" width="10" height="0" fill="#fb923c"></rect>
+                    <circle cx="30" cy="170" r="20" fill="#fb923c"></circle>
+                </svg>
+            </div>
+
+            <div id="statusMessage" class="mt-6 text-xl font-bold"></div>
+        </div>
+
+        <!-- BOTÓN DE CONEXIÓN -->
+        <div class="mt-10 text-center">
+            <button id="connectBtn" onclick="toggleConnection()" class="bg-slate-800 text-white px-10 py-4 rounded-full text-lg shadow-lg flex items-center gap-3 mx-auto">
+                <i data-lucide="bluetooth" class="w-6 h-6"></i> CONECTAR DISPOSITIVO
+            </button>
+        </div>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="bg-slate-900 text-slate-500 py-6 text-center text-xs border-t-4 border-red-600">
+        © 2025 Instituto Superior Tecnológico Vida Nueva
+    </footer>
+
+<script>
+/* ================================
+   CONTROL DE TERMÓMETROS SVG
+================================ */
+function setThermo(id, temp) {
+    const max = 140;
+    let h = (temp / 50) * max;
+    h = Math.max(0, Math.min(max, h));
+    let y = 160 - h;
+
+    let el = document.getElementById(id);
+    if (!el) return;
+
+    el.setAttribute("height", h);
+    el.setAttribute("y", y);
+}
+
+/* ================================
+   AQUÍ ABAJO PEGAMOS TODO TU JS
+   (NO MODIFIQUÉ NADA)
+================================ */
+
+lucide.createIcons();
+
+// RELOJ
+function updateClock() {
+    const now = new Date();
+    document.getElementById('timeDisplay').textContent = now.toLocaleTimeString('es-EC');
+    document.getElementById('dateDisplay').textContent = now.toLocaleDateString('es-EC');
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ============================================
+// BLUETOOTH ESP32
+// ============================================
+const serviceUuid = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+const characteristicUuid = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
+const commandCharacteristicUuid = "beb5483e-36e1-4688-b7f5-ea07361b26a9";
+
+let bluetoothDevice;
+let bleCharacteristic;
+let bleCommandCharacteristic;
+
+let heaterOn = false;
+let fanOn = false;
+
+let currentMode = "auto";
+
+document.getElementById("modeSelector").onchange = e => {
+    currentMode = e.target.value;
+};
+
+// TOGGLE CONEXIÓN
+async function toggleConnection() {
+    if (bluetoothDevice && bluetoothDevice.gatt.connected) {
+        bluetoothDevice.gatt.disconnect();
+        return;
+    }
+    connect();
+}
+
+async function connect() {
+    try {
+        bluetoothDevice = await navigator.bluetooth.requestDevice({
+            filters: [{ name: "TUVN_Termometros" }],
+            optionalServices: [serviceUuid]
+        });
+
+        let server = await bluetoothDevice.gatt.connect();
+        let service = await server.getPrimaryService(serviceUuid);
+
+        bleCharacteristic = await service.getCharacteristic(characteristicUuid);
+        await bleCharacteristic.startNotifications();
+        bleCharacteristic.addEventListener("characteristicvaluechanged", handleData);
+
+        try {
+            bleCommandCharacteristic = await service.getCharacteristic(commandCharacteristicUuid);
+        } catch {}
+
+        document.getElementById("statusText").textContent = "CONECTADO";
+
+    } catch {
+        alert("Error al conectar con ESP32");
+    }
+}
+
+// RECIBIR DATOS
+function handleData(e) {
+    const json = new TextDecoder().decode(e.target.value);
+
+    try {
+        const d = JSON.parse(json);
+
+        // MOSTRAR TEMPERATURAS
+        document.getElementById("val1").innerText = d.s1.toFixed(1);
+        document.getElementById("val2").innerText = d.s2.toFixed(1);
+        document.getElementById("val3").innerText = d.s3.toFixed(1);
+        document.getElementById("val4").innerText = d.s4.toFixed(1);
+
+        // TERMÓMETROS DE SENSORES
+        setThermo("merS1", d.s1);
+        setThermo("merS2", d.s2);
+        setThermo("merS3", d.s3);
+        setThermo("merS4", d.s4);
+
+        let avg = (d.s1 + d.s2 + d.s3 + d.s4) / 4;
+
+        document.getElementById("averageTemp").innerText = avg.toFixed(1);
+
+        // TERMÓMETRO PROMEDIO
+        setThermo("merAVG", avg);
+
+    } catch {}
+}
+
+</script>
+
+</body>
+</html>
